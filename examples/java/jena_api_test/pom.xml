@@ -1,0 +1,109 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>test</groupId>
+	<artifactId>jena_api_test</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>jar</packaging>
+
+	<name>jena_api_test</name>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+	</properties>
+
+	<dependencies>
+    <!-- dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>3.8.1</version>
+      <scope>test</scope>
+    </dependency -->
+    
+	<dependency>
+		<groupId>ontos-jena</groupId>
+		<artifactId>ontos-jena</artifactId>
+		<version>5.5-SNAPSHOT</version>
+	</dependency>    
+    
+	</dependencies>
+  
+	<build>
+		<plugins>
+			<plugin>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<version>2.4</version>
+				<executions>
+					<execution>
+						<id>assembly-files</id>
+						<phase>package</phase>
+						<goals>
+							<goal>assembly</goal>
+						</goals>
+					</execution>
+				</executions>				
+				<configuration>
+					<descriptor>assembly.xml</descriptor>
+					<archive>
+						<manifestEntries>
+							<Class-Path>. dataset.ttl</Class-Path>
+						</manifestEntries>
+					</archive>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-antrun-plugin</artifactId>
+				<version>1.7</version>
+				<executions>
+					<execution>
+						<id>exclude-files</id>
+						<phase>install</phase>
+						<goals>
+							<goal>run</goal>
+						</goals>
+						<configuration>
+							<target>
+								<jar destfile="${project.build.directory}/${project.artifactId}.jar" filesetmanifest="merge">
+									<zipfileset src="${project.build.directory}/${project.artifactId}-${project.version}-jar-with-dependencies.jar" excludes="dataset.ttl"/>
+								</jar>
+							</target>
+						</configuration>                       
+					</execution>
+				</executions>
+			</plugin>			
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-resources-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>copy-files</id>
+						<phase>install</phase>
+						<goals>
+							<goal>copy-resources</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>${project.basedir}/distr</outputDirectory>
+							<resources>
+								<resource>
+									<directory>${project.build.directory}</directory>
+									<includes>
+										<include>${project.artifactId}.jar</include>
+									</includes>
+								</resource>
+								<resource>
+									<directory>${project.build.outputDirectory}</directory>
+									<includes>
+										<include>dataset.ttl</include>
+									</includes>
+								</resource>						
+							</resources>
+						</configuration>						
+					</execution>
+				</executions>
+			</plugin>			
+		</plugins>
+	</build>  
+  
+</project>

@@ -1,0 +1,24 @@
+<assembly>
+	<id>jar-with-dependencies</id>
+	<formats>
+		<format>jar</format>
+	</formats>
+	<!-- baseDirectory></baseDirectory -->
+	<includeBaseDirectory>false</includeBaseDirectory>
+    <dependencySets>
+        <dependencySet>
+            <outputDirectory></outputDirectory>
+            <unpack>true</unpack>
+        </dependencySet>
+    </dependencySets>
+	<fileSets>
+		<fileSet>
+			<directory>target/classes</directory>
+			<outputDirectory></outputDirectory>
+			<!-- doesn't work -->
+			<excludes>
+				<exclude>dataset.ttl</exclude>
+			</excludes>
+		</fileSet>
+	</fileSets>
+</assembly>

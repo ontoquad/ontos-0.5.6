@@ -1,0 +1,1 @@
+Here we have an example of how OntoQuad can be used with Google Maps.

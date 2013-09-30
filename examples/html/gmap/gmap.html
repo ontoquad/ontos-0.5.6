@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+		<meta charset="utf-8">
+		<title>Map</title>
+		<style type="text/css">
+			html, body { margin: 0; padding: 0; width: 100%; height: 100%; 
+			} #buttons { margin: 0; padding: 3px 10px; 
+			} #map-canvas { position: absolute; top: 30px; left: 10px; right: 10px; bottom: 10px; }
+		</style>
+		<script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false"></script>
+		<script>
+			var markers = [];
+			var infos = [];
+			var map;
+
+			function getBounds(map) {
+				return {
+					lat0: map.getBounds().getSouthWest().lat(),
+					lat1: map.getBounds().getNorthEast().lat(),
+					long0: map.getBounds().getNorthEast().lng(),
+					long1: map.getBounds().getSouthWest().lng(),
+				};
+			}
+
+			function getQueryData(query, ballonFn) {
+				var url = 'http://127.0.0.1:8080/sparql?query='+encodeURIComponent(query)+'&output=json';
+				var oReq = new XMLHttpRequest();
+				oReq.onload = function () {
+					var txt = this.responseText;
+					// txt = txt.replace(/\\/g, '\\\\');
+					drawData(JSON.parse(txt), map, ballonFn);
+				};
+				oReq.open("get", url, true);
+				oReq.send();
+			}
+
+			function getVeloQuery(bounds) {
+				return 'PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#> \
+ \
+select ?address ?location ?install ?year ?racks ?lat ?long { \
+?s <http://data.sfgov.org/resource/w969-5mn4/yr_inst> ?address. \
+?s <http://data.sfgov.org/resource/w969-5mn4/location_name> ?location. \
+?s <http://data.sfgov.org/resource/w969-5mn4/installed_by_2> ?install . \
+?s <http://data.sfgov.org/resource/w969-5mn4/yr_installed> ?year . \
+?s <http://data.sfgov.org/resource/w969-5mn4/racks_installed> ?racks . \
+?s <http://data.sfgov.org/resource/w969-5mn4/latitude> ?lat . \
+?s <http://data.sfgov.org/resource/w969-5mn4/longitude> ?long . \
+FILTER( xsd:float(?lat) <= '+bounds.lat1+' && \
+        xsd:float(?lat) >= '+bounds.lat0+' && \
+        xsd:float(?long) <= '+bounds.long0+' && \
+        xsd:float(?long) >= '+bounds.long1+' \
+) \
+}';
+			}
+
+			function getVeloBallon(data) {
+				return '<table>'
+						+'<tr><td>Address:</td><td>'+data.address.value+'</td></tr>'
+						+'<tr><td>Location:</td><td>'+data.location.value+'</td></tr>'
+						+'<tr><td>Install:</td><td>'+data.install.value+'</td></tr>'
+						+'<tr><td>Year:</td><td>'+data.year.value+'</td></tr>'
+						+'<tr><td>Racks:</td><td>'+data.racks.value+'</td></tr>'
+						+'</table>';
+			}
+
+			function getFoodQuery(bounds) {
+				return 'PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#> \
+select * { \
+?s <http://data.sfgov.org/resource/rqzj-sfat/applicant> ?applicant . \
+?s <http://data.sfgov.org/resource/rqzj-sfat/facilitytype> ?facilitytype . \
+?s <http://data.sfgov.org/resource/rqzj-sfat/locationdescription> ?locationdescription . \
+?s <http://data.sfgov.org/resource/rqzj-sfat/address> ?address . \
+?s <http://data.sfgov.org/resource/rqzj-sfat/permit> ?permit . \
+?s <http://data.sfgov.org/resource/rqzj-sfat/status> ?status . \
+?s <http://data.sfgov.org/resource/rqzj-sfat/fooditems> ?fooditems . \
+?s <http://data.sfgov.org/resource/rqzj-sfat/schedule> ?schedule. \
+?s <http://data.sfgov.org/resource/rqzj-sfat/received> ?received . \
+?s <http://data.sfgov.org/resource/rqzj-sfat/expirationdate> ?expirationdate . \
+?s <http://data.sfgov.org/resource/rqzj-sfat/latitude> ?lat . \
+?s <http://data.sfgov.org/resource/rqzj-sfat/longitude> ?long . \
+FILTER( xsd:float(?lat)  <= '+bounds.lat1+' &&  \
+        xsd:float(?lat) >= '+bounds.lat0+' && \
+        xsd:float(?long) <= '+bounds.long0+' && \
+        xsd:float(?long) >= '+bounds.long1+'  \
+) \
+}';
+			}
+
+			function getFoodBallon(data) {
+				return '<table>'
+						+'<tr><td>Address:</td><td>'+data.address.value+'</td></tr>'
+						+'<tr><td>Applicant:</td><td>'+data.applicant.value+'</td></tr>'
+						+'<tr><td>Facility type:</td><td>'+data.facilitytype.value+'</td></tr>'
+						+'<tr><td>Permit:</td><td>'+data.permit.value+'</td></tr>'
+						+'<tr><td>Fooditems:</td><td>'+data.fooditems.value+'</td></tr>'
+						+'<tr><td>Schedule:</td><td><a href="'+data.schedule.value+'">'+data.schedule.value+'</a></td></tr>'
+						+'<tr><td>Status:</td><td>'+data.status.value+'</td></tr>'
+						+'<tr><td>Received:</td><td>'+data.received.value+'</td></tr>'
+						+'<tr><td>Expiration date:</td><td>'+data.expirationdate.value+'</td></tr>'
+						+'</table>';
+			}
+
+			function drawData(data, map, ballonFn) {
+				for (var i = 0; i < markers.length; i++ ) {
+					markers[i].setMap(null);
+				}
+				markers = [];
+				for (var i = 0; i < infos.length; i++ ) {
+					infos[i].close();
+				}
+				infos = [];
+
+				for (var i = 0; i < data.results.bindings.length; i++) {
+					markers[i] = new google.maps.Marker({
+						map: map,
+						position: new google.maps.LatLng(data.results.bindings[i].lat.value, data.results.bindings[i].long.value),
+						title: data.results.bindings[i].address.value,
+					});
+					markers[i].set('infoId', i);
+					infos[i] = new google.maps.InfoWindow({
+						content: ballonFn(data.results.bindings[i])
+					});
+					google.maps.event.addListener(markers[i], 'click', function() {
+						infos[this.get('infoId')].open(map, this);
+					});
+				}
+			}
+
+			function drawVelo() {
+				getQueryData(getVeloQuery(getBounds(map)), getVeloBallon);
+			}
+
+			function drawFood() {
+				getQueryData(getFoodQuery(getBounds(map)), getFoodBallon);
+			}
+
+			function initialize() {
+				var mapOptions = {
+					zoom: 17,
+					center: new google.maps.LatLng(37.783333, -122.416667), // SF coordinates from wikipedia
+					mapTypeId: google.maps.MapTypeId.ROADMAP
+				};
+
+				map = new google.maps.Map(document.getElementById('map-canvas'), mapOptions);
+
+				document.getElementById('show-velo').addEventListener('click', drawVelo, false);
+				document.getElementById('show-food').addEventListener('click', drawFood, false);
+			}
+
+			google.maps.event.addDomListener(window, 'load', initialize);
+
+		</script>
+	</head>
+	<body>
+		<div id="buttons">
+			<button id="show-velo">Bicycle Parking</button>
+			<button id="show-food">Mobile Food Facility</button>
+		</div>
+		<div id="map-canvas"></div>
+	</body>
+</html>
